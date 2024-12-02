@@ -39,7 +39,8 @@ class Certification(db.Model):
             "expiration_date": self.expiration_date.strftime("%Y-%m-%d")
         }
 
-db.create_all()
+with app.app_context():
+    db.create_all()
 
 def schedule_reminders():
     while True:
