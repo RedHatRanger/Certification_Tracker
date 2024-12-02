@@ -99,11 +99,6 @@ For production use, consider deploying this app on a cloud-based virtual machine
 gunicorn -w 4 -b 0.0.0.0:5000 cert_tracker:app
 ```
 
-### Example Gunicorn Command
-```sh
-gunicorn -w 4 -b 0.0.0.0:5000 cert_tracker:app
-```
-
 ## Security Considerations
 - Change the `app.secret_key` to a strong, random value.
 - Passwords are hashed using Werkzeug's `generate_password_hash()` for secure storage.
