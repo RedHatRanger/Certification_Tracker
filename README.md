@@ -22,7 +22,7 @@ The app is intended to run locally on a server, such as a Rocky 9 server, and us
 1. **Clone or Download the Repository**
    - Clone the repository using the following command:
      ```sh
-     git clone <repository-url>
+     git clone https://github.com/RedHatRanger/Certification_Tracker.git
      ```
    - Save the Python script (`cert_tracker.py`) on your server.
 
