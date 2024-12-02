@@ -1,10 +1,11 @@
-from flask import Flask, request, jsonify, redirect, url_for, session
+from flask import Flask, render_template, request, jsonify, redirect, url_for, session
 from datetime import datetime, timedelta
 import threading
 import time
 from functools import wraps
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
+import os
 
 app = Flask(__name__)
 app.secret_key = 'supersecretkey'  # Change this for production use
@@ -40,6 +41,57 @@ class Certification(db.Model):
         }
 
 
+# Ensure templates folder exists
+if not os.path.exists("templates"):
+    os.makedirs("templates")
+
+# Sample HTML templates for better user interface
+register_template = """
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register</title>
+</head>
+<body>
+    <h1>Register</h1>
+    <form method="post">
+        Username: <input type="text" name="username"><br>
+        Password: <input type="password" name="password"><br>
+        <input type="submit" value="Register">
+    </form>
+    <a href="/login">Already have an account? Login here.</a>
+</body>
+</html>
+"""
+
+login_template = """
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login</title>
+</head>
+<body>
+    <h1>Login</h1>
+    <form method="post">
+        Username: <input type="text" name="username"><br>
+        Password: <input type="password" name="password"><br>
+        <input type="submit" value="Login">
+    </form>
+    <a href="/register">Don't have an account? Register here.</a>
+</body>
+</html>
+"""
+
+# Save templates to the templates directory
+with open("templates/register.html", "w") as f:
+    f.write(register_template)
+
+with open("templates/login.html", "w") as f:
+    f.write(login_template)
 
 def schedule_reminders():
     while True:
@@ -75,13 +127,7 @@ def register():
         db.session.add(new_user)
         db.session.commit()
         return redirect(url_for('login'))
-    return '''
-        <form method="post">
-            Username: <input type="text" name="username"><br>
-            Password: <input type="password" name="password"><br>
-            <input type="submit" value="Register">
-        </form>
-    '''
+    return render_template('register.html')
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -93,13 +139,7 @@ def login():
             session['logged_in'] = True
             return redirect(url_for('get_certifications'))
         return jsonify({"error": "Invalid credentials"}), 401
-    return '''
-        <form method="post">
-            Username: <input type="text" name="username"><br>
-            Password: <input type="password" name="password"><br>
-            <input type="submit" value="Login">
-        </form>
-    '''
+    return render_template('login.html')
 
 @app.route('/logout')
 def logout():
