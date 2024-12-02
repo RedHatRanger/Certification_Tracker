@@ -1,7 +1,6 @@
 # Certification_Tracker
 This app is created in flask and it can be used to track certifications.
 
-
 # Certification Tracker App
 
 ## Overview
@@ -66,7 +65,39 @@ The app is intended to run locally on a server, such as a Rocky 9 server, and us
   - Deletes a certification by its ID.
 
 ## Running in Production
-For production use, consider deploying this app using a WSGI server like Gunicorn and securing it behind a web server like Nginx. Update the `app.secret_key` to a strong, unique value and consider using a more robust database like PostgreSQL or MySQL.
+For production use, consider deploying this app on a cloud-based virtual machine (VM) such as AWS EC2, Google Cloud Compute Engine, or Azure Virtual Machines. Deploying to the cloud allows for scalability, remote access, and better reliability.
+
+### Steps to Deploy on a Cloud-Based VM
+1. **Set Up a Cloud VM**
+   - Create a virtual machine on your cloud provider (e.g., AWS, GCP, Azure).
+   - Choose an appropriate image (such as Ubuntu 20.04 or Rocky Linux 9) and ensure it has Python 3.7 or higher installed.
+
+2. **Upload the Application**
+   - Transfer the `certification_tracker_app.py` file to your VM using tools like SCP or SFTP.
+
+3. **Install Dependencies**
+   - SSH into your VM and navigate to the directory containing the script.
+   - Install the necessary packages:
+     ```sh
+     pip install flask flask_sqlalchemy werkzeug
+     ```
+
+4. **Run the Application**
+   - Run the application using Gunicorn for better performance:
+     ```sh
+     gunicorn -w 4 -b 0.0.0.0:5000 certification_tracker_app:app
+     ```
+
+5. **Set Up a Reverse Proxy**
+   - Set up a web server like Nginx as a reverse proxy to forward requests to Gunicorn and to enable HTTPS.
+
+6. **Database Considerations**
+   - Instead of using SQLite, consider using a cloud-based database like AWS RDS, Google Cloud SQL, or Azure Database for PostgreSQL/MySQL for better reliability and scalability.
+
+### Example Gunicorn Command
+```sh
+gunicorn -w 4 -b 0.0.0.0:5000 certification_tracker_app:app
+```
 
 ### Example Gunicorn Command
 ```sh
