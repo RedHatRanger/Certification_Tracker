@@ -43,8 +43,9 @@ class Certification(db.Model):
 
 def schedule_reminders():
     while True:
-        current_date = datetime.now().date()
-        certifications = Certification.query.all()
+        with app.app_context():
+            current_date = datetime.now().date()
+            certifications = Certification.query.all()
         for cert in certifications:
             if cert.ce_due_date == current_date:
                 print(f"Reminder: CE is due today for certification '{cert.name}' (ID: {cert.id})")
