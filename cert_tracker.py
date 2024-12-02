@@ -47,7 +47,7 @@ if not os.path.exists("templates"):
 if not os.path.exists("static"):
     os.makedirs("static")
 
-# Sample HTML templates with CSS for Facebook-like theme
+# Sample HTML templates with CSS for a Visual theme
 register_template = """
 <!doctype html>
 <html lang="en">
@@ -160,16 +160,19 @@ a:hover {
 }
 """
 
-# Save templates to the templates directory
-with open("templates/register.html", "w") as f:
-    f.write(register_template)
+# Save templates to the templates directory only if they do not already exist
+if not os.path.exists("templates/register.html"):
+    with open("templates/register.html", "w") as f:
+        f.write(register_template)
 
-with open("templates/login.html", "w") as f:
-    f.write(login_template)
+if not os.path.exists("templates/login.html"):
+    with open("templates/login.html", "w") as f:
+        f.write(login_template)
 
-# Save CSS to the static directory
-with open("static/style.css", "w") as f:
-    f.write(style_css)
+# Save CSS to the static directory only if it does not already exist
+if not os.path.exists("static/style.css"):
+    with open("static/style.css", "w") as f:
+        f.write(style_css)
 
 def schedule_reminders():
     while True:
