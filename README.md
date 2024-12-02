@@ -20,7 +20,7 @@ The app is intended to run locally on a server, such as a Rocky 9 server, and us
 ## Setup Instructions
 
 1. **Clone or Download the Repository**
-   - Save the Python script (`certification_tracker_app.py`) on your server.
+   - Save the Python script (`cert_tracker.py`) on your server.
 
 2. **Install Dependencies**
    - Navigate to the directory containing the script and install the necessary packages:
@@ -31,7 +31,7 @@ The app is intended to run locally on a server, such as a Rocky 9 server, and us
 3. **Run the Application**
    - Initialize the database and start the Flask app:
      ```sh
-     python certification_tracker_app.py
+     python cert_tracker.py
      ```
    - The application should now be running locally on `http://127.0.0.1:5000`.
 
@@ -73,7 +73,7 @@ For production use, consider deploying this app on a cloud-based virtual machine
    - Choose an appropriate image (such as Ubuntu 20.04 or Rocky Linux 9) and ensure it has Python 3.7 or higher installed.
 
 2. **Upload the Application**
-   - Transfer the `certification_tracker_app.py` file to your VM using tools like SCP or SFTP.
+   - Transfer the `cert_tracker.py` file to your VM using tools like SCP or SFTP.
 
 3. **Install Dependencies**
    - SSH into your VM and navigate to the directory containing the script.
@@ -85,7 +85,7 @@ For production use, consider deploying this app on a cloud-based virtual machine
 4. **Run the Application**
    - Run the application using Gunicorn for better performance:
      ```sh
-     gunicorn -w 4 -b 0.0.0.0:5000 certification_tracker_app:app
+     gunicorn -w 4 -b 0.0.0.0:5000 cert_tracker:app
      ```
 
 5. **Set Up a Reverse Proxy**
@@ -96,12 +96,12 @@ For production use, consider deploying this app on a cloud-based virtual machine
 
 ### Example Gunicorn Command
 ```sh
-gunicorn -w 4 -b 0.0.0.0:5000 certification_tracker_app:app
+gunicorn -w 4 -b 0.0.0.0:5000 cert_tracker:app
 ```
 
 ### Example Gunicorn Command
 ```sh
-gunicorn -w 4 -b 0.0.0.0:5000 certification_tracker_app:app
+gunicorn -w 4 -b 0.0.0.0:5000 cert_tracker:app
 ```
 
 ## Security Considerations
