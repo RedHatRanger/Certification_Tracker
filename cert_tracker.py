@@ -41,27 +41,38 @@ class Certification(db.Model):
         }
 
 
-# Ensure templates folder exists
+# Ensure templates and static folders exist
 if not os.path.exists("templates"):
     os.makedirs("templates")
+if not os.path.exists("static"):
+    os.makedirs("static")
 
-# Sample HTML templates for better user interface
+# Sample HTML templates with CSS for Facebook-like theme
 register_template = """
 <!doctype html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="/static/style.css">
     <title>Register</title>
 </head>
 <body>
-    <h1>Register</h1>
-    <form method="post">
-        Username: <input type="text" name="username"><br>
-        Password: <input type="password" name="password"><br>
-        <input type="submit" value="Register">
-    </form>
-    <a href="/login">Already have an account? Login here.</a>
+    <div class="container">
+        <h1>Register</h1>
+        <form method="post">
+            <div class="form-group">
+                <label>Username:</label>
+                <input type="text" name="username" required>
+            </div>
+            <div class="form-group">
+                <label>Password:</label>
+                <input type="password" name="password" required>
+            </div>
+            <button type="submit" class="btn">Register</button>
+        </form>
+        <a href="/login">Already have an account? Login here.</a>
+    </div>
 </body>
 </html>
 """
@@ -72,18 +83,81 @@ login_template = """
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="/static/style.css">
     <title>Login</title>
 </head>
 <body>
-    <h1>Login</h1>
-    <form method="post">
-        Username: <input type="text" name="username"><br>
-        Password: <input type="password" name="password"><br>
-        <input type="submit" value="Login">
-    </form>
-    <a href="/register">Don't have an account? Register here.</a>
+    <div class="container">
+        <h1>Login</h1>
+        <form method="post">
+            <div class="form-group">
+                <label>Username:</label>
+                <input type="text" name="username" required>
+            </div>
+            <div class="form-group">
+                <label>Password:</label>
+                <input type="password" name="password" required>
+            </div>
+            <button type="submit" class="btn">Login</button>
+        </form>
+        <a href="/register">Don't have an account? Register here.</a>
+    </div>
 </body>
 </html>
+"""
+
+# Sample CSS for Facebook-like theme
+style_css = """
+body {
+    font-family: Arial, sans-serif;
+    background-color: #f0f2f5;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    margin: 0;
+}
+.container {
+    background-color: #ffffff;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    width: 300px;
+    text-align: center;
+}
+.form-group {
+    margin-bottom: 15px;
+    text-align: left;
+}
+label {
+    font-weight: bold;
+}
+input[type="text"], input[type="password"] {
+    width: 100%;
+    padding: 10px;
+    margin-top: 5px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+.btn {
+    background-color: #1877f2;
+    color: white;
+    padding: 10px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    width: 100%;
+}
+.btn:hover {
+    background-color: #155db2;
+}
+a {
+    color: #1877f2;
+    text-decoration: none;
+}
+a:hover {
+    text-decoration: underline;
+}
 """
 
 # Save templates to the templates directory
@@ -92,6 +166,10 @@ with open("templates/register.html", "w") as f:
 
 with open("templates/login.html", "w") as f:
     f.write(login_template)
+
+# Save CSS to the static directory
+with open("static/style.css", "w") as f:
+    f.write(style_css)
 
 def schedule_reminders():
     while True:
