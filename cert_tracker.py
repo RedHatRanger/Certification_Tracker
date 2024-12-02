@@ -39,8 +39,7 @@ class Certification(db.Model):
             "expiration_date": self.expiration_date.strftime("%Y-%m-%d")
         }
 
-with app.app_context():
-    db.create_all()
+
 
 def schedule_reminders():
     while True:
@@ -164,6 +163,8 @@ def delete_certification(cert_id):
     return jsonify({"message": "Certification deleted"}), 200
 
 if __name__ == '__main__':
+    with app.app_context():
+        db.create_all()  # Creates the database tables within the app context
     reminder_thread = threading.Thread(target=schedule_reminders, daemon=True)
     reminder_thread.start()
     app.run(debug=True)
