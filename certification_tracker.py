@@ -18,32 +18,24 @@ def load_certs():
     with open(JSON_FILE, 'r') as f:
         try:
             data = json.load(f)
-            # Ensure loaded data is a list
             return data if isinstance(data, list) else []
         except (json.JSONDecodeError, FileNotFoundError):
             return [] 
 
 def save_certs(certs):
     """Saves the current list of certifications to the JSON file."""
-    # Convert date objects back to strings before saving to JSON
     for cert in certs:
-        # Check if the value is a datetime object or Pandas Timestamp and format it
         if isinstance(cert.get('date'), (datetime, pd.Timestamp)):
              cert['date'] = cert['date'].strftime('%Y-%m-%d')
         if isinstance(cert.get('expires'), (datetime, pd.Timestamp)):
              cert['expires'] = cert['expires'].strftime('%Y-%m-%d')
         
-        # Ensure that empty expiration dates are saved as "N/A"
         if cert.get('expires') is None or cert.get('expires') == "":
              cert['expires'] = "N/A"
         
-        # Ensure fee is a standard float/int for consistent saving
         if isinstance(cert.get('fee'), (int, float)):
              cert['fee'] = float(cert['fee'])
 
-    # Sort by date achieved (most recent first)
-    certs.sort(key=lambda x: x.get('date', '1900-01-01'), reverse=True)
-    
     with open(JSON_FILE, 'w') as f:
         json.dump(certs, f, indent=4)
 
@@ -56,11 +48,9 @@ def add_certification(certs):
     with st.form("add_cert_form", clear_on_submit=True):
         new_cert = {}
         
-        # Core Details
         new_cert['name'] = st.text_input("Certification Name", key="name_input")
         new_cert['issuer'] = st.text_input("Issuing Organization", key="issuer_input")
         
-        # Dates
         date_achieved = st.date_input("Date Achieved", key="date_input", 
                                       min_value=datetime(2000, 1, 1), 
                                       max_value=datetime.now())
@@ -70,7 +60,6 @@ def add_certification(certs):
                                      min_value=datetime.now(), value=None)
         new_cert['expires'] = expires_date.strftime('%Y-%m-%d') if expires_date else "N/A"
         
-        # Financial Details
         st.markdown("---")
         st.markdown("**Renewal/Financial Details (AMF)**")
         new_cert['fee'] = st.number_input("Renewal/Annual Fee (USD)", 
@@ -91,52 +80,37 @@ def add_certification(certs):
                 certs.append(new_cert)
                 save_certs(certs)
                 st.success(f"Added **{new_cert['name']}**! Changes applied.")
-                st.rerun() # Rerun to show the new cert in the table
+                st.rerun() 
             else:
                 st.error("Certification Name and Issuer are required.")
 
-def display_certifications(certs):
-    """Displays all current certifications in an editable table."""
-    st.subheader("📜 Current Certifications (Editable)")
+def display_certifications_table(certs):
+    """Displays all current certifications in a non-editable table, sorted by the selector."""
+    st.subheader("📜 Current Certifications (Sorted Table)")
     
     if not certs:
         st.info("No certifications found. Add one using the form.")
-        return None
+        return 
     
-    # Data now already contains datetime objects from the main function's conversion
+    # Data is already sorted in the main function
     df = pd.DataFrame(certs) 
     
-    # Define column types for better editing experience
+    # Define column types for display formatting (not editing)
     column_config = {
-        "fee": st.column_config.NumberColumn(
-            "Renewal/Annual Fee (USD)",
-            help="Annual fee to maintain this certification.",
-            format="$%0.2f",
-        ),
-        "date": st.column_config.DateColumn(
-            "Date Achieved", format="YYYY-MM-DD"
-        ),
-        "expires": st.column_config.DateColumn(
-            "Expiration Date", format="YYYY-MM-DD"
-        ),
-        "renewal_frequency": st.column_config.SelectboxColumn(
-            "Renewal Frequency",
-            options=['None/One-Time', 'Annual', 'Biennial (Every 2 years)', 'Triennial (Every 3 years)', 'Other']
-        )
+        "fee": st.column_config.NumberColumn("Renewal/Annual Fee (USD)", format="$%0.2f"),
+        "date": st.column_config.DateColumn("Date Achieved", format="YYYY-MM-DD"),
+        "expires": st.column_config.DateColumn("Expiration Date", format="YYYY-MM-DD"),
+        "renewal_frequency": "Renewal Frequency" # Simple rename
     }
 
-    # Use data_editor for an editable table
-    edited_df = st.data_editor(
+    # Use st.dataframe for guaranteed display of the pre-sorted data
+    st.dataframe(
         df, 
         use_container_width=True, 
         hide_index=True, 
-        num_rows="dynamic", # Allows users to add or delete rows
         column_config=column_config,
-        key="cert_data_editor"
+        # IMPORTANT: rely only on the Python sort.
     )
-    
-    # Return the edited DataFrame as a list of dicts
-    return edited_df.to_dict('records')
 
 def display_due_soon_block(certs):
     """Filters and displays certifications ordered by their expiration date."""
@@ -146,17 +120,13 @@ def display_due_soon_block(certs):
     today = datetime.now().date()
     due_soon_certs = []
     
-    # Filter and calculate days left
     for cert in certs:
-        # Get expiration date, handling both datetime objects (from st.data_editor) 
-        # and string objects (from direct JSON load)
         expiry_val = cert.get('expires')
         
         if expiry_val is None or expiry_val == "N/A":
             continue
 
         try:
-            # Convert to date object for comparison
             if isinstance(expiry_val, datetime):
                 expiry_date = expiry_val.date()
             elif isinstance(expiry_val, str):
@@ -166,12 +136,11 @@ def display_due_soon_block(certs):
             
             days_left = (expiry_date - today).days
             
-            # Check if the cert is expiring within the next 180 days (6 months)
             if 0 <= days_left <= 180:
                 due_soon_certs.append({
                     'Certification': cert['name'],
                     'Issuer': cert['issuer'],
-                    'Expiration Date': expiry_date.strftime('%Y-%m-%d'), # Use formatted string for display
+                    'Expiration Date': expiry_date.strftime('%Y-%m-%d'), 
                     'Renewal Fee': f"${cert.get('fee', 0.00):.2f}",
                     'Days Left': days_left
                 })
@@ -179,12 +148,11 @@ def display_due_soon_block(certs):
             continue
 
     if due_soon_certs:
-        # Convert to DataFrame and sort by Days Left (ascending)
+        # Convert to DataFrame and sort by Days Left (ascending) - default for urgency
         due_soon_df = pd.DataFrame(due_soon_certs).sort_values(by='Days Left', ascending=True)
         
         st.warning("These certifications require attention for renewal or CE credits!")
         
-        # Display the sorted, filtered list
         st.dataframe(
             due_soon_df, 
             hide_index=True, 
@@ -199,7 +167,6 @@ def display_summary(certs):
     """Displays key financial and expiration summaries."""
     st.markdown("---")
     
-    # Calculate Total Annual Fee
     total_annual_fee = 0.00
     
     for cert in certs:
@@ -213,8 +180,6 @@ def display_summary(certs):
         elif frequency == 'Triennial (Every 3 years)':
             total_annual_fee += (float(fee) / 3.0) if fee else 0
             
-    
-    # --- Display Metrics ---
     col3, col4 = st.columns(2)
     
     with col3:
@@ -237,44 +202,57 @@ def main():
     st.set_page_config(layout="wide", page_title="IT Certification Tracker")
     
     st.title("👨‍💻 IT Certification & Fee Tracker")
-    st.markdown("Manage your professional certifications, renewal fees (AMFs), and expiration dates. Your data is stored locally in **`certifications.json`**.")
+    st.markdown("Manage your professional certifications, renewal fees (AMFs), and expiration dates. Data is loaded from **`certifications.json`**.")
     
     # 1. Load data
     certs_list = load_certs()
     
-    # --- FIX: Convert list of dicts to DataFrame for date type conversion ---
+    # --- Data Type Conversion and Preparation ---
     if certs_list:
         df = pd.DataFrame(certs_list)
-        
-        # Explicitly convert string columns to datetime objects. 
-        # Errors='coerce' handles "N/A" and invalid dates by turning them into NaT (Not a Time).
         df['date'] = pd.to_datetime(df['date'], errors='coerce')
         df['expires'] = pd.to_datetime(df['expires'], errors='coerce')
-        
-        # Convert back to list of dicts. The dates are now datetime objects.
         certs = df.to_dict('records')
     else:
-        certs = [] # Handle the case of no certifications loaded
+        certs = [] 
+    
     # --------------------------------------------------------------------------
     
+    # --- Layout ---
     col1, col2 = st.columns([1, 2])
     
     # 2. Add Certification form
     with col1:
         add_certification(certs)
 
-    # 3. Display and Edit Table
-    with col2:
-        edited_certs = display_certifications(certs)
+    # 3. Sorting Selector (Guaranteed Sorting)
+    if certs:
+        # These are the columns available for sorting
+        sort_options = ['date', 'expires', 'name', 'issuer', 'fee']
+        st.markdown("---")
         
-        # Check if data was edited in the table
-        if edited_certs is not None and edited_certs != certs:
-            # 4. Save Changes to JSON
-            save_certs(edited_certs)
-            st.success("Table changes successfully saved to JSON file!")
-            st.rerun() 
+        sort_col, check_col = st.columns([1, 1])
+        
+        with sort_col:
+            sort_by = st.selectbox("Sort Table By:", sort_options, 
+                                format_func=lambda x: x.replace('_', ' ').title(), 
+                                index=1) # Default to sorting by EXPIRES
+        
+        with check_col:
+            st.markdown("<br>", unsafe_allow_html=True)
+            # Default to ascending for dates/expires (earliest first) and descending for fees/names
+            sort_ascending = st.checkbox('Sort Ascending', value=True if sort_by in ['date', 'expires'] else False) 
 
-    # 5. Display the CE/Expiration Due Soon Block (Highest Priority)
+        # Apply the explicit Python sort
+        df_to_sort = pd.DataFrame(certs)
+        df_to_sort = df_to_sort.sort_values(by=sort_by, ascending=sort_ascending, na_position='last')
+        certs = df_to_sort.to_dict('records') # Update the main list with sorted data
+
+    # 4. Display Table (Non-Editable)
+    with col2:
+        display_certifications_table(certs)
+
+    # 5. Display the CE/Expiration Due Soon Block 
     display_due_soon_block(certs)
     
     # 6. Display Summary Metrics
