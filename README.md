@@ -30,10 +30,10 @@ Open your terminal or command prompt and run:
 pip install streamlit pandas
 ```
 
-2. Prepare the Code
+### 2. Prepare the Code
 Create a file named streamlit_app.py and paste the entire Python code block provided in the Usage Guide below into it.
 
-3. Run the Application
+### 3. Run the Application
 Execute the Python script using Streamlit:
 ```bash
 python3 -m streamlit run streamlit_app.py
@@ -41,21 +41,18 @@ python3 -m streamlit run streamlit_app.py
 
 The application will automatically open in your default web browser (usually at http://localhost:8501).
 
-📖 Usage Guide
-Data Management Philosophy
+## 📖 Usage Guide
+### Data Management Philosophy
 Since standard interactive table sorting can be unstable across different versions of Streamlit, this application uses a robust form-based entry and selector-based sorting model for maximum reliability:
 
-Adding Data: Use the form on the left.
+- Adding Data: Use the form on the left.
+- Sorting Data: Use the "Sort Table By:" selector above the table.
+- Editing/Deleting Data: For maintenance, you must manually edit the certifications.json file and then refresh the app.
 
-Sorting Data: Use the "Sort Table By:" selector above the table.
+#### Sorting the Main Table
+- The main table's display order is determined by your selection in the dropdown:
+- Use the "Sort Table By:" dropdown to choose the column (e.g., Expiration Date, Fee, Name).
+- Use the "Sort Ascending" checkbox to toggle the direction of the sort.
+- The entire table will reorder based on your selection.
 
-Editing/Deleting Data: For maintenance, you must manually edit the certifications.json file and then refresh the app.
-
-Sorting the Main Table
-The main table's display order is determined by your selection in the dropdown:
-
-Use the "Sort Table By:" dropdown to choose the column (e.g., Expiration Date, Fee, Name).
-
-Use the "Sort Ascending" checkbox to toggle the direction of the sort.
-
-The entire table will reorder based on your selection.
+ENJOY!
