@@ -3,6 +3,8 @@
 
 A powerful, local web application built with **Streamlit** and **Pandas** to help IT professionals manage their active certifications, track expiration dates, calculate annual maintenance fees (AMFs), and prioritize renewals.
 
+<img width="1869" height="763" alt="image" src="https://github.com/user-attachments/assets/c118499c-9915-4da0-8718-26f7e8eefe41" />
+
 ## ✨ Features
 
 * **Persistent Storage:** All certification data is stored locally in a single **`certifications.json`** file.
