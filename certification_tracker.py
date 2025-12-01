@@ -21,7 +21,8 @@ def load_certs():
         try:
             data = json.load(f)
             if isinstance(data, list):
-                required_keys = ['cert_id', 'date', 'expires', 'fee', 'renewal_frequency']
+                # ADDED 'amf_due_date' to required_keys
+                required_keys = ['cert_id', 'date', 'expires', 'fee', 'renewal_frequency', 'amf_due_date']
                 for cert in data:
                     for key in required_keys:
                         if key not in cert:
@@ -42,6 +43,12 @@ def save_certs(certs):
             cert['expires'] = "N/A"
         elif isinstance(expires_val, (datetime, pd.Timestamp)):
             cert['expires'] = expires_val.strftime('%Y-%m-%d')
+        
+        amf_due_date_val = cert.get('amf_due_date')
+        if amf_due_date_val is None or str(amf_due_date_val).upper() in ["N/A", "NAT", "NONE", ""]:
+            cert['amf_due_date'] = "N/A"
+        elif isinstance(amf_due_date_val, (datetime, pd.Timestamp)):
+            cert['amf_due_date'] = amf_due_date_val.strftime('%Y-%m-%d')
         
         fee_val = cert.get('fee')
         try:
@@ -67,21 +74,36 @@ def add_certification(certs_list):
     with st.form("add_cert_form", clear_on_submit=True):
         new_cert = {}
         
+        # Certification Details
         new_cert['name'] = st.text_input("Certification Name", key="name_input")
         new_cert['issuer'] = st.text_input("Issuing Organization", key="issuer_input")
         new_cert['cert_id'] = st.text_input("Certificate ID# (Optional)", key="cert_id_input") 
         
+        # Date Achieved
         date_achieved = st.date_input("Date Achieved", key="date_input", 
                                         min_value=datetime(2000, 1, 1), 
                                         max_value=datetime.now())
         new_cert['date'] = date_achieved.strftime('%Y-%m-%d')
         
+        # Expiration Date
         expires_date = st.date_input("Expiration Date (Optional)", key="expires_input", 
                                         min_value=datetime.now(), value=None)
         new_cert['expires'] = expires_date.strftime('%Y-%m-%d') if expires_date else "N/A"
         
+        # MOVED RENEWAL FREQUENCY HERE (Index 3 = Triennial default)
+        new_cert['renewal_frequency'] = st.selectbox("Renewal Frequency", 
+                                                    ['None/One-Time', 'Annual', 'Biennial (Every 2 years)', 'Triennial (Every 3 years)', 'Other'], 
+                                                    index=3, 
+                                                    key="frequency_input")
+        
         st.markdown("---")
         st.markdown("**Renewal/Financial Details (AMF)**")
+        
+        # AMF Due Date INPUT
+        amf_due_date = st.date_input("AMF Due Date (Optional)", key="amf_due_date_input", 
+                                     min_value=datetime.now(), value=None)
+        new_cert['amf_due_date'] = amf_due_date.strftime('%Y-%m-%d') if amf_due_date else "N/A"
+        
         new_cert['fee'] = st.number_input("Renewal/Annual Fee (USD)", 
                                             min_value=0.00, 
                                             value=0.00, 
@@ -89,12 +111,6 @@ def add_certification(certs_list):
                                             format="%.2f", 
                                             key="fee_input")
 
-        # <<< CRITICAL CHANGE: Sets the default index to 3 (Triennial)
-        new_cert['renewal_frequency'] = st.selectbox("Renewal Frequency", 
-                                                    ['None/One-Time', 'Annual', 'Biennial (Every 2 years)', 'Triennial (Every 3 years)', 'Other'], 
-                                                    index=3, 
-                                                    key="frequency_input")
-        
         submitted = st.form_submit_button("Add Certification")
 
         if submitted:
@@ -130,6 +146,11 @@ def display_certifications_table(df_certs):
             "Expiration Date", 
             format="YYYY-MM-DD"
         ),
+        "amf_due_date": st.column_config.DateColumn(
+            "AMF Due Date", 
+            format="YYYY-MM-DD",
+            required=False
+        ),
         "renewal_frequency": st.column_config.SelectboxColumn(
             "Renewal Frequency",
             options=['None/One-Time', 'Annual', 'Biennial (Every 2 years)', 'Triennial (Every 3 years)', 'Other'],
@@ -141,7 +162,7 @@ def display_certifications_table(df_certs):
     }
     
     column_order = [
-        'name', 'issuer', 'cert_id', 'date', 'expires', 'renewal_frequency', 'fee'
+        'name', 'issuer', 'cert_id', 'date', 'expires', 'renewal_frequency', 'amf_due_date', 'fee'
     ]
 
     edited_df = st.data_editor(
@@ -150,7 +171,8 @@ def display_certifications_table(df_certs):
         hide_index=True, 
         column_config=column_config,
         column_order=column_order,
-        num_rows="dynamic", # Enables adding/deleting rows
+        num_rows="dynamic",
+        height=600, 
         key="editable_cert_table" 
     )
     
@@ -172,46 +194,70 @@ def display_due_soon_block(certs):
     due_soon_certs = []
     
     for cert in certs:
+        # Check both Expiration and AMF Due Date for attention
         expiry_val = cert.get('expires')
+        amf_due_date_val = cert.get('amf_due_date')
         
-        if expiry_val is None or str(expiry_val).upper() in ["N/A", "NAT", "NONE", ""]:
+        dates_to_check = []
+        if expiry_val and str(expiry_val).upper() not in ["N/A", "NAT", "NONE", ""]:
+            dates_to_check.append((expiry_val, 'Expiration'))
+        if amf_due_date_val and str(amf_due_date_val).upper() not in ["N/A", "NAT", "NONE", ""]:
+            dates_to_check.append((amf_due_date_val, 'AMF Payment'))
+
+        if not dates_to_check:
             continue
 
-        try:
-            if isinstance(expiry_val, (datetime, pd.Timestamp)):
-                expiry_date = expiry_val.date()
-            elif isinstance(expiry_val, str):
-                expiry_date = datetime.strptime(expiry_val, '%Y-%m-%d').date()
-            else:
+        attention_needed = False
+        
+        # Check if the closest attention date is within 180 days
+        for date_val, type_str in dates_to_check:
+            try:
+                if isinstance(date_val, (datetime, pd.Timestamp)):
+                    check_date = date_val.date()
+                elif isinstance(date_val, str):
+                    check_date = datetime.strptime(date_val, '%Y-%m-%d').date()
+                else:
+                    continue
+                
+                days_left = (check_date - today).days
+                
+                if 0 <= days_left <= 180:
+                    attention_needed = True
+                    break # Only need one trigger to list the cert
+            except (ValueError, TypeError):
                 continue
+
+        if attention_needed:
+            # Determine the closest date for sorting/display
+            closest_date = min([datetime.strptime(str(d[0]).split(' ')[0], '%Y-%m-%d').date() for d in dates_to_check if d[0] != 'N/A'], default=today + pd.Timedelta(days=181))
             
-            days_left = (expiry_date - today).days
-            
+            days_left = (closest_date - today).days
+
             if 0 <= days_left <= 180:
                 due_soon_certs.append({
                     'Certification': cert['name'],
                     'Certificate ID#': cert.get('cert_id', ''), 
                     'Issuer': cert['issuer'],
-                    'Expiration Date': expiry_date.strftime('%Y-%m-%d'), 
+                    'Expiration Date': cert.get('expires', 'N/A'),
+                    'AMF Due Date': cert.get('amf_due_date', 'N/A'), 
                     'Renewal Fee': f"${cert.get('fee', 0.00):.2f}",
                     'Days Left': days_left
                 })
-        except (ValueError, TypeError):
-            continue
+
 
     if due_soon_certs:
         due_soon_df = pd.DataFrame(due_soon_certs).sort_values(by='Days Left', ascending=True)
         
-        st.warning("These certifications require attention for renewal or CE credits!")
+        st.warning("These certifications require attention for renewal, fee payment, or CE credits!")
         
         st.dataframe(
             due_soon_df, 
             hide_index=True, 
             use_container_width=True,
-            column_order=('Certification', 'Expiration Date', 'Days Left', 'Renewal Fee', 'Certificate ID#', 'Issuer')
+            column_order=('Certification', 'Expiration Date', 'AMF Due Date', 'Days Left', 'Renewal Fee', 'Certificate ID#', 'Issuer')
         )
     else:
-        st.info("No certifications are due for renewal in the next 6 months.")
+        st.info("No certifications are due for renewal or AMF payment in the next 6 months.")
 
 
 def display_summary(certs):
@@ -297,16 +343,23 @@ def main():
         df['date'] = pd.to_datetime(df['date'], errors='coerce')
         df['expires'] = df['expires'].replace(['N/A', '', 'None'], pd.NaT)
         df['expires'] = pd.to_datetime(df['expires'], errors='coerce')
+        
+        # Convert AMF Due Date
+        df['amf_due_date'] = df['amf_due_date'].replace(['N/A', '', 'None'], pd.NaT)
+        df['amf_due_date'] = pd.to_datetime(df['amf_due_date'], errors='coerce')
+        
     else:
         df = pd.DataFrame()
     
-    col1, col2 = st.columns([1, 2])
+    # CRITICAL CHANGE: Set column ratio to 1:3 (25% for form, 75% for table)
+    col1, col2 = st.columns([1, 3]) 
     
     with col1:
         add_certification(certs_list)
 
     if not df.empty:
-        sort_options = ['date', 'expires', 'name', 'issuer', 'fee', 'cert_id'] 
+        # Added 'amf_due_date' to sorting options
+        sort_options = ['date', 'expires', 'amf_due_date', 'name', 'issuer', 'fee', 'cert_id'] 
         st.markdown("---")
         
         sort_col, check_col = st.columns([1, 1])
@@ -318,7 +371,7 @@ def main():
         
         with check_col:
             st.markdown("<br>", unsafe_allow_html=True)
-            sort_ascending = st.checkbox('Sort Ascending', value=True if sort_by in ['date', 'expires'] else False) 
+            sort_ascending = st.checkbox('Sort Ascending', value=True if sort_by in ['date', 'expires', 'amf_due_date'] else False) 
 
         df = df.sort_values(by=sort_by, ascending=sort_ascending, na_position='last')
         
@@ -335,24 +388,21 @@ def main():
             final_df = edited_df
             
             if deleted_rows_indices:
-                # 1. Get the current index of the DataFrame
                 current_indices = set(final_df.index)
-                
-                # 2. Filter the deletion list to ensure we only try to drop existing indices
                 valid_deleted_indices = [i for i in deleted_rows_indices if i in current_indices]
                 
                 if valid_deleted_indices:
-                    # 3. Use drop() with the validated list
                     final_df = final_df.drop(valid_deleted_indices)
             
-            # Reset the index to ensure a clean sequential index for the final list
             final_df = final_df.reset_index(drop=True)
             
             # --- END DELETION FIX ---
             
             # Clean NaT values before final conversion to dictionary for saving
             final_df['expires'] = final_df['expires'].replace({pd.NaT: None})
-            
+            # Clean NaT values for AMF Due Date
+            final_df['amf_due_date'] = final_df['amf_due_date'].replace({pd.NaT: None})
+
             updated_certs = final_df.to_dict('records')
             
             save_certs(updated_certs)
