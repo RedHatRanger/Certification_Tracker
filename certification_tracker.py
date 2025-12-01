@@ -1,5 +1,5 @@
 # python3 -m pip install streamlit pandas
-# streamlit run certification_tracker.py
+# python -m streamlit run certification_tracker.py
 import streamlit as st
 import json
 import os
@@ -18,6 +18,11 @@ def load_certs():
     with open(JSON_FILE, 'r') as f:
         try:
             data = json.load(f)
+            # Ensure 'cert_id' is present for existing records on load
+            if isinstance(data, list):
+                for cert in data:
+                    if 'cert_id' not in cert:
+                        cert['cert_id'] = "" # Add missing key if older records exist
             return data if isinstance(data, list) else []
         except (json.JSONDecodeError, FileNotFoundError):
             return [] 
@@ -26,15 +31,18 @@ def save_certs(certs):
     """Saves the current list of certifications to the JSON file."""
     for cert in certs:
         if isinstance(cert.get('date'), (datetime, pd.Timestamp)):
-             cert['date'] = cert['date'].strftime('%Y-%m-%d')
+            cert['date'] = cert['date'].strftime('%Y-%m-%d')
         if isinstance(cert.get('expires'), (datetime, pd.Timestamp)):
-             cert['expires'] = cert['expires'].strftime('%Y-%m-%d')
+            cert['expires'] = cert['expires'].strftime('%Y-%m-%d')
         
         if cert.get('expires') is None or cert.get('expires') == "":
-             cert['expires'] = "N/A"
+            cert['expires'] = "N/A"
         
         if isinstance(cert.get('fee'), (int, float)):
-             cert['fee'] = float(cert['fee'])
+            cert['fee'] = float(cert['fee'])
+            
+        # Ensure cert_id is saved as a string (handling potential non-string values)
+        cert['cert_id'] = str(cert.get('cert_id', '')) # Save the Certificate ID
 
     with open(JSON_FILE, 'w') as f:
         json.dump(certs, f, indent=4)
@@ -51,23 +59,26 @@ def add_certification(certs):
         new_cert['name'] = st.text_input("Certification Name", key="name_input")
         new_cert['issuer'] = st.text_input("Issuing Organization", key="issuer_input")
         
+        # ADDED: Input for Certificate ID
+        new_cert['cert_id'] = st.text_input("Certificate ID# (Optional)", key="cert_id_input") 
+        
         date_achieved = st.date_input("Date Achieved", key="date_input", 
-                                      min_value=datetime(2000, 1, 1), 
-                                      max_value=datetime.now())
+                                        min_value=datetime(2000, 1, 1), 
+                                        max_value=datetime.now())
         new_cert['date'] = date_achieved.strftime('%Y-%m-%d')
         
         expires_date = st.date_input("Expiration Date (Optional)", key="expires_input", 
-                                     min_value=datetime.now(), value=None)
+                                        min_value=datetime.now(), value=None)
         new_cert['expires'] = expires_date.strftime('%Y-%m-%d') if expires_date else "N/A"
         
         st.markdown("---")
         st.markdown("**Renewal/Financial Details (AMF)**")
         new_cert['fee'] = st.number_input("Renewal/Annual Fee (USD)", 
-                                          min_value=0.00, 
-                                          value=0.00, 
-                                          step=10.00, 
-                                          format="%.2f", 
-                                          key="fee_input")
+                                            min_value=0.00, 
+                                            value=0.00, 
+                                            step=10.00, 
+                                            format="%.2f", 
+                                            key="fee_input")
 
         new_cert['renewal_frequency'] = st.selectbox("Renewal Frequency", 
                                                     ['None/One-Time', 'Annual', 'Biennial (Every 2 years)', 'Triennial (Every 3 years)', 'Other'], 
@@ -100,8 +111,14 @@ def display_certifications_table(certs):
         "fee": st.column_config.NumberColumn("Renewal/Annual Fee (USD)", format="$%0.2f"),
         "date": st.column_config.DateColumn("Date Achieved", format="YYYY-MM-DD"),
         "expires": st.column_config.DateColumn("Expiration Date", format="YYYY-MM-DD"),
-        "renewal_frequency": "Renewal Frequency" # Simple rename
+        "renewal_frequency": "Renewal Frequency", # Simple rename
+        "cert_id": "Certificate ID#" # ADDED: Column for Certificate ID
     }
+    
+    # Define the order of columns to display
+    column_order = [
+        'name', 'issuer', 'cert_id', 'date', 'expires', 'renewal_frequency', 'fee'
+    ]
 
     # Use st.dataframe for guaranteed display of the pre-sorted data
     st.dataframe(
@@ -109,6 +126,7 @@ def display_certifications_table(certs):
         use_container_width=True, 
         hide_index=True, 
         column_config=column_config,
+        column_order=column_order
         # IMPORTANT: rely only on the Python sort.
     )
 
@@ -139,6 +157,7 @@ def display_due_soon_block(certs):
             if 0 <= days_left <= 180:
                 due_soon_certs.append({
                     'Certification': cert['name'],
+                    'Certificate ID#': cert.get('cert_id', ''), # ADDED to due soon list
                     'Issuer': cert['issuer'],
                     'Expiration Date': expiry_date.strftime('%Y-%m-%d'), 
                     'Renewal Fee': f"${cert.get('fee', 0.00):.2f}",
@@ -157,7 +176,7 @@ def display_due_soon_block(certs):
             due_soon_df, 
             hide_index=True, 
             use_container_width=True,
-            column_order=('Certification', 'Expiration Date', 'Days Left', 'Renewal Fee', 'Issuer')
+            column_order=('Certification', 'Expiration Date', 'Days Left', 'Renewal Fee', 'Certificate ID#', 'Issuer') # Adjusted order
         )
     else:
         st.info("No certifications are due for renewal in the next 6 months.")
@@ -211,6 +230,8 @@ def main():
     if certs_list:
         df = pd.DataFrame(certs_list)
         df['date'] = pd.to_datetime(df['date'], errors='coerce')
+        # Handle "N/A" strings in 'expires' before conversion
+        df['expires'] = df['expires'].replace('N/A', pd.NaT)
         df['expires'] = pd.to_datetime(df['expires'], errors='coerce')
         certs = df.to_dict('records')
     else:
@@ -227,8 +248,8 @@ def main():
 
     # 3. Sorting Selector (Guaranteed Sorting)
     if certs:
-        # These are the columns available for sorting
-        sort_options = ['date', 'expires', 'name', 'issuer', 'fee']
+        # Added 'cert_id' to available sorting options
+        sort_options = ['date', 'expires', 'name', 'issuer', 'fee', 'cert_id'] 
         st.markdown("---")
         
         sort_col, check_col = st.columns([1, 1])
@@ -240,7 +261,7 @@ def main():
         
         with check_col:
             st.markdown("<br>", unsafe_allow_html=True)
-            # Default to ascending for dates/expires (earliest first) and descending for fees/names
+            # Default to ascending for dates/expires (earliest first) and descending for fees/names/ids
             sort_ascending = st.checkbox('Sort Ascending', value=True if sort_by in ['date', 'expires'] else False) 
 
         # Apply the explicit Python sort
