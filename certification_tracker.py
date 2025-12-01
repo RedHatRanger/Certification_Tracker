@@ -1,5 +1,5 @@
 # python3 -m pip install streamlit pandas
-# python -m streamlit run certification_tracker.py
+# python3 -m streamlit run certification_tracker.py
 import streamlit as st
 import json
 import os
@@ -21,7 +21,6 @@ def load_certs():
         try:
             data = json.load(f)
             if isinstance(data, list):
-                # Ensure all required keys are present for DataFrame compatibility
                 required_keys = ['cert_id', 'date', 'expires', 'fee', 'renewal_frequency']
                 for cert in data:
                     for key in required_keys:
@@ -34,50 +33,41 @@ def load_certs():
 def save_certs(certs):
     """Saves the current list of certifications to the JSON file."""
     for cert in certs:
-        # Date: Convert datetime/Timestamp objects if present
         date_val = cert.get('date')
         if isinstance(date_val, (datetime, pd.Timestamp)):
             cert['date'] = date_val.strftime('%Y-%m-%d')
 
-        # Expires: Handle None, NaT, or empty strings by converting to "N/A"
         expires_val = cert.get('expires')
         if expires_val is None or str(expires_val).upper() in ["N/A", "NAT", "NONE", ""]:
             cert['expires'] = "N/A"
         elif isinstance(expires_val, (datetime, pd.Timestamp)):
             cert['expires'] = expires_val.strftime('%Y-%m-%d')
         
-        # Ensure fee is saved as a float
         fee_val = cert.get('fee')
         try:
             cert['fee'] = float(fee_val) if fee_val else 0.00
         except (TypeError, ValueError):
             cert['fee'] = 0.00
             
-        # Ensure cert_id is saved as a string 
         cert['cert_id'] = str(cert.get('cert_id', ''))
 
     try:
         with open(JSON_FILE, 'w') as f:
             json.dump(certs, f, indent=4)
     except Exception as e:
-        # Display error if saving fails
         st.error(f"FATAL SAVE ERROR: Could not write to file! Details: {e}")
 
 
 # --- Streamlit UI Components ---
 
 def add_certification(certs_list):
-    """Streamlit form to add a new certification."""
     st.subheader("➕ Add New Certification")
     
     with st.form("add_cert_form", clear_on_submit=True):
         new_cert = {}
         
-        # Required fields
         new_cert['name'] = st.text_input("Certification Name", key="name_input")
         new_cert['issuer'] = st.text_input("Issuing Organization", key="issuer_input")
-        
-        # New field
         new_cert['cert_id'] = st.text_input("Certificate ID# (Optional)", key="cert_id_input") 
         
         date_achieved = st.date_input("Date Achieved", key="date_input", 
@@ -114,15 +104,13 @@ def add_certification(certs_list):
                 st.error("Certification Name and Issuer are required.")
 
 def display_certifications_table(df_certs):
-    """Displays all current certifications in an EDITABLE table using st.data_editor.
-       CRITICAL FIX: Uses session state to reliably detect changes to existing rows."""
+    """Displays all current certifications in an EDITABLE table using st.data_editor."""
     st.subheader("📝 Current Certifications (Editable)")
     
     if df_certs.empty:
         st.info("No certifications found. Add one using the form.")
         return df_certs
     
-    # Define column configurations for editing and display
     column_config = {
         "fee": st.column_config.NumberColumn(
             "Renewal/Annual Fee (USD)", 
@@ -159,23 +147,21 @@ def display_certifications_table(df_certs):
         hide_index=True, 
         column_config=column_config,
         column_order=column_order,
+        num_rows="dynamic", # Enables adding/deleting rows
         key="editable_cert_table" 
     )
     
-    # --- CRITICAL FIX START: Reliable change detection via Session State ---
+    # Reliable change detection via Session State
     changes = st.session_state.get('editable_cert_table', {})
     
-    # Check for edited rows, added rows, or deleted rows
     if changes.get('edited_rows') or changes.get('added_rows') or changes.get('deleted_rows'):
         st.session_state['data_edited'] = True
     else:
         st.session_state['data_edited'] = False
-    # --- CRITICAL FIX END ---
     
     return edited_df
 
 def display_due_soon_block(certs):
-    """Filters and displays certifications ordered by their expiration date."""
     st.markdown("---")
     st.subheader("🗓️ Certifications Due Soon (Next 180 Days)")
     
@@ -185,12 +171,10 @@ def display_due_soon_block(certs):
     for cert in certs:
         expiry_val = cert.get('expires')
         
-        # Skip if expired or marked as N/A/None/NaT
         if expiry_val is None or str(expiry_val).upper() in ["N/A", "NAT", "NONE", ""]:
             continue
 
         try:
-            # Handle date formats from different sources 
             if isinstance(expiry_val, (datetime, pd.Timestamp)):
                 expiry_date = expiry_val.date()
             elif isinstance(expiry_val, str):
@@ -228,7 +212,6 @@ def display_due_soon_block(certs):
 
 
 def display_summary(certs):
-    """Displays key financial and expiration summaries."""
     st.markdown("---")
     
     total_annual_fee = 0.00
@@ -273,7 +256,6 @@ def main():
     st.title("👨‍💻 IT Certification & Fee Tracker")
     st.markdown("Manage your professional certifications, renewal fees (AMFs), and expiration dates. Data is loaded from **`certifications.json`**.")
     
-    # 1. Initialize session state for tracking edits
     if 'data_edited' not in st.session_state:
         st.session_state['data_edited'] = False
         
@@ -282,7 +264,6 @@ def main():
     st.sidebar.subheader("File Path Debug")
     st.sidebar.code(f"JSON File Path:\n{JSON_FILE}", language="text")
     
-    # Initialize file if it doesn't exist
     if not os.path.exists(JSON_FILE):
         st.sidebar.warning("File not found! Attempting to create empty file...")
         try:
@@ -305,7 +286,6 @@ def main():
     st.sidebar.markdown("---")
     # --- DEBUG BLOCK END ---
     
-    # 2. Load data
     certs_list = load_certs()
     
     # --- Data Type Conversion and Preparation for DataFrame ---
@@ -317,14 +297,11 @@ def main():
     else:
         df = pd.DataFrame()
     
-    # --- Layout ---
     col1, col2 = st.columns([1, 2])
     
-    # 3. Add Certification form 
     with col1:
         add_certification(certs_list)
 
-    # 4. Sorting Selector 
     if not df.empty:
         sort_options = ['date', 'expires', 'name', 'issuer', 'fee', 'cert_id'] 
         st.markdown("---")
@@ -340,10 +317,8 @@ def main():
             st.markdown("<br>", unsafe_allow_html=True)
             sort_ascending = st.checkbox('Sort Ascending', value=True if sort_by in ['date', 'expires'] else False) 
 
-        # Apply the explicit Python sort to the DataFrame
         df = df.sort_values(by=sort_by, ascending=sort_ascending, na_position='last')
         
-    # 5. Display and Capture Edits 
     with col2:
         edited_df = display_certifications_table(df)
     
@@ -351,29 +326,45 @@ def main():
     if st.session_state['data_edited']:
         if st.button("💾 Save Changes to JSON", type="primary"):
             
-            # CRITICAL FIX: Replace Pandas NaT (Not a Time) with Python None 
-            edited_df['expires'] = edited_df['expires'].replace({pd.NaT: None})
+            # --- DELETION FIX: Use .drop() with index values and validation ---
+            deleted_rows_indices = st.session_state.get('editable_cert_table', {}).get('deleted_rows', [])
             
-            updated_certs = edited_df.to_dict('records')
+            final_df = edited_df
+            
+            if deleted_rows_indices:
+                # 1. Get the current index of the DataFrame
+                current_indices = set(final_df.index)
+                
+                # 2. Filter the deletion list to ensure we only try to drop existing indices
+                valid_deleted_indices = [i for i in deleted_rows_indices if i in current_indices]
+                
+                if valid_deleted_indices:
+                    # 3. Use drop() with the validated list
+                    final_df = final_df.drop(valid_deleted_indices)
+            
+            # Reset the index to ensure a clean sequential index for the final list
+            final_df = final_df.reset_index(drop=True)
+            
+            # --- END DELETION FIX ---
+            
+            # Clean NaT values before final conversion to dictionary for saving
+            final_df['expires'] = final_df['expires'].replace({pd.NaT: None})
+            
+            updated_certs = final_df.to_dict('records')
             
             save_certs(updated_certs)
-            st.success("Changes saved successfully! Rerunning application to display updated data...")
+            st.success("Changes and deletions saved successfully! Rerunning application...")
             st.session_state['data_edited'] = False 
             st.rerun()
         
-        st.warning("Click 'Save Changes to JSON' to make edits permanent.")
+        st.warning("Click 'Save Changes to JSON' to make edits/deletions permanent.")
         
-        # Use the edited data for immediate feedback in subsequent blocks
         certs_for_display = edited_df.to_dict('records')
     else:
-        # Use the original (or sorted) data
         certs_for_display = df.to_dict('records')
 
 
-    # 7. Display the CE/Expiration Due Soon Block 
     display_due_soon_block(certs_for_display)
-    
-    # 8. Display Summary Metrics
     display_summary(certs_for_display)
 
 if __name__ == "__main__":
