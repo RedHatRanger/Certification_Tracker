@@ -8,7 +8,6 @@ from datetime import datetime
 
 # --- Configuration (FIXED PATH for reliable saving) ---
 JSON_FILENAME = 'certifications.json' 
-# Calculates the absolute path to ensure the file is saved next to the script
 JSON_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), JSON_FILENAME) 
 
 # --- JSON Data Management Functions ---
@@ -21,7 +20,6 @@ def load_certs():
         try:
             data = json.load(f)
             if isinstance(data, list):
-                # ADDED 'amf_due_date' to required_keys
                 required_keys = ['cert_id', 'date', 'expires', 'fee', 'renewal_frequency', 'amf_due_date']
                 for cert in data:
                     for key in required_keys:
@@ -124,13 +122,17 @@ def add_certification(certs_list):
 
 def display_certifications_table(df_certs):
     """Displays all current certifications in an EDITABLE table using st.data_editor."""
-    st.subheader("📝 Current Certifications (Editable)")
+    st.subheader("📝 Current Certifications (Click headers to sort)")
     
     if df_certs.empty:
         st.info("No certifications found. Add one using the form.")
         return df_certs
     
     column_config = {
+        "Delete": st.column_config.CheckboxColumn(
+            "Delete?",
+            default=False,
+        ),
         "fee": st.column_config.NumberColumn(
             "Renewal/Annual Fee (USD)", 
             format="$%0.2f",
@@ -161,8 +163,9 @@ def display_certifications_table(df_certs):
         "issuer": st.column_config.TextColumn("Issuing Organization", required=True),
     }
     
+    # ADDED "Delete" to the beginning of the column order
     column_order = [
-        'name', 'issuer', 'cert_id', 'date', 'expires', 'renewal_frequency', 'amf_due_date', 'fee'
+        'Delete', 'name', 'issuer', 'cert_id', 'date', 'expires', 'renewal_frequency', 'amf_due_date', 'fee'
     ]
 
     edited_df = st.data_editor(
@@ -171,7 +174,6 @@ def display_certifications_table(df_certs):
         hide_index=True, 
         column_config=column_config,
         column_order=column_order,
-        num_rows="dynamic",
         height=600, 
         key="editable_cert_table" 
     )
@@ -179,7 +181,7 @@ def display_certifications_table(df_certs):
     # Reliable change detection via Session State
     changes = st.session_state.get('editable_cert_table', {})
     
-    if changes.get('edited_rows') or changes.get('added_rows') or changes.get('deleted_rows'):
+    if changes.get('edited_rows'):
         st.session_state['data_edited'] = True
     else:
         st.session_state['data_edited'] = False
@@ -223,7 +225,7 @@ def display_due_soon_block(certs):
                 
                 if 0 <= days_left <= 180:
                     attention_needed = True
-                    break # Only need one trigger to list the cert
+                    break 
             except (ValueError, TypeError):
                 continue
 
@@ -261,8 +263,7 @@ def display_due_soon_block(certs):
 
 
 def display_summary(certs):
-    st.markdown("---")
-    
+    # This section now ONLY calculates the Annual AMF Estimate
     total_annual_fee = 0.00
     
     for cert in certs:
@@ -281,20 +282,13 @@ def display_summary(certs):
         elif frequency == 'Triennial (Every 3 years)':
             total_annual_fee += (fee / 3.0)
             
-    col3, col4 = st.columns(2)
-    
-    with col3:
-        st.metric(
-            "Total Annual AMF Estimate",
-            f"${total_annual_fee:.2f}",
-            help="Estimated total fees to maintain all annual, biennial, and triennial certifications."
-        )
-
-    with col4:
-        st.metric(
-            "Total Certifications Tracked",
-            len(certs)
-        )
+    # Display the Annual Fee metric below the Due Soon block
+    st.markdown("---")
+    st.metric(
+        "Annual Fee Estimate",
+        f"${total_annual_fee:.2f}",
+        help="Estimated total fees to maintain all annual, biennial, and triennial certifications."
+    )
 
 
 # --- Main Application Logic ---
@@ -308,7 +302,7 @@ def main():
     if 'data_edited' not in st.session_state:
         st.session_state['data_edited'] = False
         
-    # --- DEBUG BLOCK START: File path verification and initialization ---
+    # --- DEBUG BLOCK START ---
     st.sidebar.markdown("---")
     st.sidebar.subheader("File Path Debug")
     st.sidebar.code(f"JSON File Path:\n{JSON_FILE}", language="text")
@@ -347,34 +341,34 @@ def main():
         # Convert AMF Due Date
         df['amf_due_date'] = df['amf_due_date'].replace(['N/A', '', 'None'], pd.NaT)
         df['amf_due_date'] = pd.to_datetime(df['amf_due_date'], errors='coerce')
+
+        # Add the 'Delete' checkbox column for display in the editor
+        df['Delete'] = False 
+        
+        # Initial Data Sorting: Sort by Expiration Date ascending (nearer dates first)
+        df = df.sort_values(by='expires', ascending=True, na_position='last')
         
     else:
         df = pd.DataFrame()
+        # Initialize an empty dataframe with the 'Delete' column if no data exists
+        df = pd.DataFrame(columns=['Delete', 'name', 'issuer', 'cert_id', 'date', 'expires', 'renewal_frequency', 'amf_due_date', 'fee'])
+
     
-    # CRITICAL CHANGE: Set column ratio to 1:3 (25% for form, 75% for table)
+    # Column ratio 1:3 for form:table
     col1, col2 = st.columns([1, 3]) 
+    
+    # --- DISPLAY TOTAL COUNT ---
+    # Moved the Total Certifications count up to be prominent
+    total_certs = len(certs_list)
+    st.metric("Total Certifications Tracked", total_certs)
+    st.markdown("---")
+    # ---------------------------
     
     with col1:
         add_certification(certs_list)
-
-    if not df.empty:
-        # Added 'amf_due_date' to sorting options
-        sort_options = ['date', 'expires', 'amf_due_date', 'name', 'issuer', 'fee', 'cert_id'] 
-        st.markdown("---")
         
-        sort_col, check_col = st.columns([1, 1])
-        
-        with sort_col:
-            sort_by = st.selectbox("Sort Table By:", sort_options, 
-                                format_func=lambda x: x.replace('_', ' ').title(), 
-                                index=1) 
-        
-        with check_col:
-            st.markdown("<br>", unsafe_allow_html=True)
-            sort_ascending = st.checkbox('Sort Ascending', value=True if sort_by in ['date', 'expires', 'amf_due_date'] else False) 
-
-        df = df.sort_values(by=sort_by, ascending=sort_ascending, na_position='last')
-        
+    # st.markdown("---") # Removed this line since the metric added one above
+    
     with col2:
         edited_df = display_certifications_table(df)
     
@@ -382,21 +376,14 @@ def main():
     if st.session_state['data_edited']:
         if st.button("💾 Save Changes to JSON", type="primary"):
             
-            # --- DELETION FIX: Use .drop() with index values and validation ---
-            deleted_rows_indices = st.session_state.get('editable_cert_table', {}).get('deleted_rows', [])
+            # --- Deletion and Saving Logic ---
+            final_df = edited_df.copy()
             
-            final_df = edited_df
+            # 1. Filter out deleted rows (where Delete checkbox is True)
+            final_df = final_df[final_df['Delete'] == False]
             
-            if deleted_rows_indices:
-                current_indices = set(final_df.index)
-                valid_deleted_indices = [i for i in deleted_rows_indices if i in current_indices]
-                
-                if valid_deleted_indices:
-                    final_df = final_df.drop(valid_deleted_indices)
-            
-            final_df = final_df.reset_index(drop=True)
-            
-            # --- END DELETION FIX ---
+            # 2. Drop the temporary 'Delete' column before saving to JSON
+            final_df = final_df.drop(columns=['Delete'])
             
             # Clean NaT values before final conversion to dictionary for saving
             final_df['expires'] = final_df['expires'].replace({pd.NaT: None})
@@ -412,13 +399,15 @@ def main():
         
         st.warning("Click 'Save Changes to JSON' to make edits/deletions permanent.")
         
-        certs_for_display = edited_df.to_dict('records')
+        # Prepare data for the due soon block, retaining the 'Delete' column until saved
+        certs_for_display = edited_df.drop(columns=['Delete']).to_dict('records')
     else:
-        certs_for_display = df.to_dict('records')
+        # If no edit happened, use the original df without the 'Delete' column
+        certs_for_display = df.drop(columns=['Delete']).to_dict('records')
 
 
     display_due_soon_block(certs_for_display)
-    display_summary(certs_for_display)
+    display_summary(certs_for_display) # Now only displays Annual Fee Estimate
 
 if __name__ == "__main__":
     main()
