@@ -61,6 +61,7 @@ def save_certs(certs):
 # --- Streamlit UI Components ---
 
 def add_certification(certs_list):
+    """Streamlit form to add a new certification."""
     st.subheader("➕ Add New Certification")
     
     with st.form("add_cert_form", clear_on_submit=True):
@@ -88,8 +89,10 @@ def add_certification(certs_list):
                                             format="%.2f", 
                                             key="fee_input")
 
+        # <<< CRITICAL CHANGE: Sets the default index to 3 (Triennial)
         new_cert['renewal_frequency'] = st.selectbox("Renewal Frequency", 
                                                     ['None/One-Time', 'Annual', 'Biennial (Every 2 years)', 'Triennial (Every 3 years)', 'Other'], 
+                                                    index=3, 
                                                     key="frequency_input")
         
         submitted = st.form_submit_button("Add Certification")
